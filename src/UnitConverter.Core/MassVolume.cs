@@ -8,8 +8,8 @@ public static class MassVolume
 {
     public static IReadOnlyList<Unit> Units { get; } = [.. Catalog.Mass.Units, .. Catalog.Volume.Units];
 
-    public static Unit DefaultFrom => Catalog.Mass.Find("kg")!;
-    public static Unit DefaultTo => Catalog.Volume.Find("L")!;
+    public static Unit DefaultFrom => Catalog.Volume.Find("gal")!;
+    public static Unit DefaultTo => Catalog.Mass.Find("lb")!;
 
     public static Unit? Find(string symbol) =>
         Units.FirstOrDefault(u => string.Equals(u.Symbol, symbol, StringComparison.Ordinal));
@@ -37,12 +37,20 @@ public static class MassVolume
 /// <summary>A material with a typical density, for quick mass/volume conversions.</summary>
 public sealed record Material(string Name, double KgPerL)
 {
+    private static readonly Unit PoundsPerGallon = Catalog.Density.Find("lb/gal")!;
+
+    /// <summary>Weight per US gallon, the usual way to state it in US plants (water ≈ 8.34).</summary>
+    public double LbPerGal => PoundsPerGallon.FromBase(KgPerL);
+
+    public static Material FromLbPerGal(string name, double lbPerGal) => new(name, PoundsPerGallon.ToBase(lbPerGal));
+
     /// <summary>Typical densities near room temperature. Real fluids vary with temperature and grade.</summary>
     public static IReadOnlyList<Material> Common { get; } =
     [
-        new("Water", 1.0),
+        FromLbPerGal("Water", 8.34),
         new("Seawater", 1.025),
         new("Milk", 1.03),
+        FromLbPerGal("Liquid egg", 8.64),
         new("Ethanol", 0.789),
         new("Gasoline", 0.745),
         new("Diesel", 0.832),

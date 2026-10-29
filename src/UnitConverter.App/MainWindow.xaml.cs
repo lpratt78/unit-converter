@@ -41,18 +41,17 @@ public partial class MainWindow : Window
         SetTopmost(settings.Topmost);
         RestorePosition();
 
-        foreach (var box in new[] { FromBox, ToBox, DensityBox, MultiplierBox, InMinBox, InMaxBox, OutMinBox, OutMaxBox, ScaleInBox, ScaleOutBox })
+        foreach (var box in new[] { FromBox, ToBox, DensityBox, InMinBox, InMaxBox, OutMinBox, OutMaxBox, ScaleInBox, ScaleOutBox })
             box.PreviewMouseLeftButtonDown += TextBox_PreviewMouseLeftButtonDown;
 
         // Parameters, filled before any mode is shown so the first calculation sees them.
         _updating = true;
         var culture = CultureInfo.CurrentCulture;
-        MultiplierBox.Text = Converter.Format(settings.Multiplier, culture);
         MaterialBox.ItemsSource = Material.Common;
         DensityUnitBox.ItemsSource = Catalog.Density.Units;
-        var densityUnit = Catalog.Density.Find(settings.DensityUnit) ?? Catalog.Density.DefaultFrom;
+        var densityUnit = Catalog.Density.Find(settings.WeightFactorUnit) ?? Catalog.Density.DefaultTo;
         DensityUnitBox.SelectedItem = densityUnit;
-        DensityBox.Text = Converter.Format(densityUnit.FromBase(settings.DensityKgPerL), culture);
+        DensityBox.Text = Converter.Format(densityUnit.FromBase(settings.WeightFactorKgPerL), culture);
         ScalePresetBox.ItemsSource = ScalePreset.Common;
         InMinBox.Text = Converter.Format(settings.ScaleInMin, culture);
         InMaxBox.Text = Converter.Format(settings.ScaleInMax, culture);
@@ -252,12 +251,6 @@ public partial class MainWindow : Window
         Recalculate();
     }
 
-    private void MultiplierBox_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (!_updating)
-            Recalculate();
-    }
-
     private void DensityBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         if (_updating)
@@ -275,8 +268,8 @@ public partial class MainWindow : Window
             return;
 
         // Keep the same physical density, shown in the new unit.
-        _settings.DensityUnit = unit.Symbol;
-        SetText(DensityBox, Converter.Format(unit.FromBase(_settings.DensityKgPerL), Culture));
+        _settings.WeightFactorUnit = unit.Symbol;
+        SetText(DensityBox, Converter.Format(unit.FromBase(_settings.WeightFactorKgPerL), Culture));
         Recalculate();
     }
 
@@ -323,14 +316,7 @@ public partial class MainWindow : Window
     {
         if (FromUnit is not { } from || ToUnit is not { } to)
             return;
-        ClearInvalid(MultiplierBox, DensityBox, FromBox, ToBox);
-
-        if (!TryParse(MultiplierBox, out var multiplier, allowEmpty: true, emptyValue: 1) || multiplier == 0)
-        {
-            Fail(MultiplierBox, "Multiplier must be a non-zero number");
-            return;
-        }
-        _settings.Multiplier = multiplier;
+        ClearInvalid(DensityBox, FromBox, ToBox);
 
         var density = 1.0;
         if (mode.Kind == ModeKind.MassVolume)
@@ -338,11 +324,11 @@ public partial class MainWindow : Window
             var densityUnit = (Unit)DensityUnitBox.SelectedItem;
             if (!TryParse(DensityBox, out var shown) || !(densityUnit.ToBase(shown) > 0))
             {
-                Fail(DensityBox, "Density must be a positive number");
+                Fail(DensityBox, "Multiplier must be a positive number");
                 return;
             }
             density = densityUnit.ToBase(shown);
-            _settings.DensityKgPerL = density;
+            _settings.WeightFactorKgPerL = density;
         }
 
         double Convert(double value, Unit a, Unit b) => mode.Kind == ModeKind.MassVolume
@@ -351,13 +337,12 @@ public partial class MainWindow : Window
 
         var target = Partner(_source);
         if (!TryCompute(target, x => IsForward(_source)
-                ? Convert(x, from, to) * multiplier
-                : Convert(x / multiplier, to, from)))
+                ? Convert(x, from, to)
+                : Convert(x, to, from)))
             return;
 
-        var rate = Converter.Format(Convert(1, from, to) * multiplier, Culture);
-        var suffix = multiplier == 1 ? "" : $"  (incl. ×{Converter.Format(multiplier, Culture)})";
-        SetStatus($"1 {from.Symbol} = {rate} {to.Symbol}{suffix}");
+        var rate = Converter.Format(Convert(1, from, to), Culture);
+        SetStatus($"1 {from.Symbol} = {rate} {to.Symbol}");
     }
 
     private void RecalculateScale()

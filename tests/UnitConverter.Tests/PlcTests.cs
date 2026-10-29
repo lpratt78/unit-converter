@@ -89,4 +89,15 @@ public class PlcTests
     [Fact]
     public void WaterIsAbout8Point345PoundsPerGallon() =>
         Assert.Equal(8.345404452, Converter.Convert(1, Catalog.Density.Find("kg/L")!, Catalog.Density.Find("lb/gal")!), 6);
+
+    [Theory]
+    [InlineData("Water", 8.34)]
+    [InlineData("Liquid egg", 8.64)]
+    public void PresetsUsePoundsPerGallon(string name, double lbPerGal)
+    {
+        var material = Material.Common.Single(m => m.Name == name);
+        Assert.Equal(lbPerGal, material.LbPerGal, 9);
+        // 10 gal of it weighs 10 × the factor in pounds.
+        Assert.Equal(lbPerGal * 10, MassVolume.Convert(10, U("gal"), U("lb"), material.KgPerL), 9);
+    }
 }

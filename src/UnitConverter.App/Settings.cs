@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using UnitConverter.Core;
 
 namespace UnitConverter.App;
 
@@ -19,12 +20,12 @@ public sealed class Settings
     /// <summary>Last chosen [from, to] unit symbols, keyed by category name.</summary>
     public Dictionary<string, string[]> Units { get; set; } = new();
 
-    /// <summary>Applied to every unit conversion result; 1 means off.</summary>
-    public double Multiplier { get; set; } = 1;
-
-    /// <summary>Density for mass/volume conversions, always stored in kg/L.</summary>
-    public double DensityKgPerL { get; set; } = 1;
-    public string DensityUnit { get; set; } = "kg/L";
+    /// <summary>
+    /// Weight-per-volume multiplier for mass/volume conversions, always stored in kg/L
+    /// and shown in <see cref="WeightFactorUnit"/>. Defaults to water at 8.34 lb/gal.
+    /// </summary>
+    public double WeightFactorKgPerL { get; set; } = Catalog.Density.Find("lb/gal")!.ToBase(8.34);
+    public string WeightFactorUnit { get; set; } = "lb/gal";
 
     public double ScaleInMin { get; set; } = 4;
     public double ScaleInMax { get; set; } = 20;

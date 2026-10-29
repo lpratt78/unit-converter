@@ -3,8 +3,7 @@
 A small, always-on-top unit converter widget for Windows 10 and 11.
 
 - **Unit categories:** length, mass, volume, temperature, pressure, flow, density, area, speed, time and data (decimal KB/MB/GB and binary KiB/MiB/GiB).
-- **Mass ↔ Volume:** converts kg, lb and so on to L, gal and so on using a density you type, or pick a material preset (water, diesel, glycol and others).
-- **Multiplier:** an optional factor applied to every unit result (1 = off). When it isn't 1, the status line says so.
+- **Mass ↔ Volume:** converts gallons, litres and so on to pounds, kilograms and so on using a weight multiplier (default 8.34 lb/gal for water). Type your own, change its unit (lb/gal, kg/L, SG…), or pick a preset such as liquid egg (8.64 lb/gal), milk or diesel.
 - **Scaling:** linear scaling like a PLC SCP/SCL/NORM_X+SCALE_X. Set input min/max (or pick a preset such as 4–20 mA, 0–10 V or Siemens 0–27648) and output min/max, then type a value on either side. The status line shows the slope and offset (`Out = 6.25 × In − 25`) and warns when the input is outside its range.
 - **Two-way:** type in either box and the other updates as you type.
 - **Stays out of the way:** lives in the notification area. `Ctrl+Alt+U` shows or hides it from anywhere.
