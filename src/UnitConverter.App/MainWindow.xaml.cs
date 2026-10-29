@@ -378,18 +378,54 @@ public partial class MainWindow : Window
 
         if (!TryCompute(Partner(_source), v => IsForward(_source) ? scale.Scale(v) : scale.Unscale(v)))
             return;
+        SyncSlider(scale);
 
         // Warn when the input is outside its range, since the result is then extrapolated.
         if (TryParse(ScaleInBox, out var input) && !scale.IsInputInRange(input))
         {
-            SetStatus($"⚠ Input outside {Converter.Format(inMin, Culture)} – {Converter.Format(inMax, Culture)}, extrapolated");
+            SetStatus($"⚠ Input 1 outside {Converter.Format(inMin, Culture)} – {Converter.Format(inMax, Culture)}, extrapolated");
             return;
         }
 
         var offset = scale.Offset;
         var sign = offset < 0 ? "−" : "+";
         var offsetText = offset == 0 ? "" : $" {sign} {Converter.Format(Math.Abs(offset), Culture)}";
-        SetStatus($"Out = {Converter.Format(scale.Slope, Culture)} × In{offsetText}");
+        SetStatus($"Input 2 = {Converter.Format(scale.Slope, Culture)} × Input 1{offsetText}");
+    }
+
+    /// <summary>Moves the slider to Input 1 and labels it with the range ends and percent of span.</summary>
+    private void SyncSlider(LinearScale scale)
+    {
+        var lo = Math.Min(scale.InMin, scale.InMax);
+        var hi = Math.Max(scale.InMin, scale.InMax);
+        SliderMinText.Text = Converter.Format(lo, Culture);
+        SliderMaxText.Text = Converter.Format(hi, Culture);
+        if (!TryParse(ScaleInBox, out var input))
+            return;
+
+        _updating = true;
+        ScaleSlider.Minimum = lo;
+        ScaleSlider.Maximum = hi;
+        ScaleSlider.SmallChange = (hi - lo) / 100;
+        ScaleSlider.LargeChange = (hi - lo) / 10;
+        ScaleSlider.Value = Math.Clamp(input, lo, hi);
+        _updating = false;
+
+        var percent = (input - scale.InMin) / (scale.InMax - scale.InMin) * 100;
+        SliderPercentText.Text = $"{Converter.Format(Math.Round(percent, 1), Culture)} %";
+    }
+
+    private void ScaleSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        var range = ScaleSlider.Maximum - ScaleSlider.Minimum;
+        if (_updating || !(range > 0))
+            return;
+
+        // Round to about a thousandth of the span, so 4–20 gives 12.34 and 0–27648 gives whole counts.
+        var decimals = Math.Clamp(3 - (int)Math.Floor(Math.Log10(range)), 0, 10);
+        SetText(ScaleInBox, Converter.Format(Math.Round(e.NewValue, decimals), Culture));
+        _source = ScaleInBox;
+        Recalculate();
     }
 
     /// <summary>

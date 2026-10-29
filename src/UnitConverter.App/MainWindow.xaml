@@ -123,13 +123,13 @@
                     <TextBlock Grid.Column="1" Text="Min" Style="{StaticResource FieldLabel}" Margin="2,0,0,4" />
                     <TextBlock Grid.Column="3" Text="Max" Style="{StaticResource FieldLabel}" Margin="2,0,0,4" />
 
-                    <TextBlock Grid.Row="1" Text="Input" Style="{StaticResource FieldLabel}" />
+                    <TextBlock Grid.Row="1" Text="Input 1" Style="{StaticResource FieldLabel}" />
                     <TextBox x:Name="InMinBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource SmallBox}"
                              TextChanged="RangeBox_TextChanged" GotKeyboardFocus="TextBox_GotKeyboardFocus" />
                     <TextBox x:Name="InMaxBox" Grid.Row="1" Grid.Column="3" Style="{StaticResource SmallBox}"
                              TextChanged="RangeBox_TextChanged" GotKeyboardFocus="TextBox_GotKeyboardFocus" />
 
-                    <TextBlock Grid.Row="3" Text="Output" Style="{StaticResource FieldLabel}" />
+                    <TextBlock Grid.Row="3" Text="Input 2" Style="{StaticResource FieldLabel}" />
                     <TextBox x:Name="OutMinBox" Grid.Row="3" Grid.Column="1" Style="{StaticResource SmallBox}"
                              TextChanged="RangeBox_TextChanged" GotKeyboardFocus="TextBox_GotKeyboardFocus" />
                     <TextBox x:Name="OutMaxBox" Grid.Row="3" Grid.Column="3" Style="{StaticResource SmallBox}"
@@ -137,7 +137,7 @@
                 </Grid>
 
                 <ComboBox x:Name="ScalePresetBox" Margin="56,6,0,0" Style="{StaticResource DarkComboBox}"
-                          Tag="Input range preset…" ItemTemplate="{StaticResource PresetTemplate}"
+                          Tag="Input 1 range preset…" ItemTemplate="{StaticResource PresetTemplate}"
                           SelectionChanged="ScalePresetBox_SelectionChanged" />
 
                 <Grid Margin="0,14,0,0">
@@ -145,20 +145,35 @@
                         <ColumnDefinition Width="56" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Input" Style="{StaticResource FieldLabel}" />
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Input 1" Style="{StaticResource FieldLabel}" />
                     <TextBox x:Name="ScaleInBox" Grid.Column="1" Style="{StaticResource ValueBox}"
                              TextChanged="ValueBox_TextChanged" GotKeyboardFocus="TextBox_GotKeyboardFocus" />
+
+                    <!-- Drag to set Input 1 anywhere in its range -->
+                    <Slider x:Name="ScaleSlider" Grid.Row="1" Grid.Column="1" Margin="0,6,0,0"
+                            Style="{StaticResource DarkSlider}" ValueChanged="ScaleSlider_ValueChanged"
+                            ToolTip="Drag to adjust Input 1" />
+                    <Grid Grid.Row="2" Grid.Column="1">
+                        <TextBlock x:Name="SliderMinText" HorizontalAlignment="Left" Style="{StaticResource FieldLabel}" FontSize="11" />
+                        <TextBlock x:Name="SliderPercentText" HorizontalAlignment="Center" Style="{StaticResource FieldLabel}" FontSize="11" />
+                        <TextBlock x:Name="SliderMaxText" HorizontalAlignment="Right" Style="{StaticResource FieldLabel}" FontSize="11" />
+                    </Grid>
                 </Grid>
 
                 <Button Style="{StaticResource IconPush}" Content="&#xE8CB;" HorizontalAlignment="Center"
-                        Margin="56,4,0,4" ToolTip="Swap input and output ranges (Ctrl+R)" Click="SwapButton_Click" />
+                        Margin="56,2,0,4" ToolTip="Swap Input 1 and Input 2 ranges (Ctrl+R)" Click="SwapButton_Click" />
 
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="56" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Text="Output" Style="{StaticResource FieldLabel}" />
+                    <TextBlock Text="Input 2" Style="{StaticResource FieldLabel}" />
                     <TextBox x:Name="ScaleOutBox" Grid.Column="1" Style="{StaticResource ValueBox}"
                              TextChanged="ValueBox_TextChanged" GotKeyboardFocus="TextBox_GotKeyboardFocus" />
                 </Grid>

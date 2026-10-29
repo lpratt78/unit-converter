@@ -4,7 +4,7 @@ A small, always-on-top unit converter widget for Windows 10 and 11.
 
 - **Unit categories:** length, mass, volume, temperature, pressure, flow, density, area, speed, time and data (decimal KB/MB/GB and binary KiB/MiB/GiB).
 - **Mass ↔ Volume:** converts gallons, litres and so on to pounds, kilograms and so on using a weight multiplier (default 8.34 lb/gal for water). Type your own, change its unit (lb/gal, kg/L, SG…), or pick a preset such as liquid egg (8.64 lb/gal), milk or diesel.
-- **Scaling:** linear scaling like a PLC SCP/SCL/NORM_X+SCALE_X. Set input min/max (or pick a preset such as 4–20 mA, 0–10 V or Siemens 0–27648) and output min/max, then type a value on either side. The status line shows the slope and offset (`Out = 6.25 × In − 25`) and warns when the input is outside its range.
+- **Scaling:** linear scaling like a PLC SCP/SCL/NORM_X+SCALE_X. Set the Input 1 range (or pick a preset such as 4–20 mA, 0–10 V or Siemens 0–27648) and the Input 2 range, then type Input 1 or drag the slider to get the scaled Input 2 value (you can also type Input 2 to go the other way). The slider shows the percent of span, and the status line shows the formula (`Input 2 = 6.25 × Input 1 − 25`) and warns when Input 1 is outside its range.
 - **Two-way:** type in either box and the other updates as you type.
 - **Stays out of the way:** lives in the notification area. `Ctrl+Alt+U` shows or hides it from anywhere.
 - **Remembers** its position, the last category and the units you picked for each category.
@@ -16,7 +16,7 @@ A small, always-on-top unit converter widget for Windows 10 and 11.
 | --- | --- |
 | `Ctrl+Alt+U` | Show / hide the widget (works from any app) |
 | `Ctrl+1` … `Ctrl+9` | Switch mode (1 = Scaling, 2 = Mass ↔ Volume, 3 = Length, …) |
-| `Ctrl+R` | Swap units (in Scaling, swaps the input and output ranges) |
+| `Ctrl+R` | Swap units (in Scaling, swaps the Input 1 and Input 2 ranges) |
 | `Ctrl+Shift+C` | Copy the converted value |
 | `Esc` | Hide to tray |
 
