@@ -14,17 +14,20 @@ namespace UnitConverter.App;
 
 public partial class MainWindow : Window
 {
+    private const string Invalid = "Invalid";
+
     private readonly Settings _settings;
-    private readonly DispatcherTimer _statusTimer = new() { Interval = TimeSpan.FromSeconds(1.5) };
+    private readonly DispatcherTimer _flashTimer = new() { Interval = TimeSpan.FromSeconds(1.5) };
     private GlobalHotKey? _hotKey;
 
-    /// <summary>The box the user last typed in; the other box shows the converted value.</summary>
+    /// <summary>The value box the user last typed in; its partner shows the result.</summary>
     private TextBox _source;
 
     /// <summary>Set while the code is changing controls, so change handlers don't recurse.</summary>
     private bool _updating;
     private bool _exiting;
     private bool _positioned;
+    private string _status = "";
 
     public event Action? HiddenToTray;
 
@@ -33,25 +36,47 @@ public partial class MainWindow : Window
         InitializeComponent();
         _settings = settings;
         _source = FromBox;
-        _statusTimer.Tick += (_, _) => { _statusTimer.Stop(); UpdateStatus(); };
+        _flashTimer.Tick += (_, _) => { _flashTimer.Stop(); StatusText.Text = _status; };
 
         SetTopmost(settings.Topmost);
         RestorePosition();
 
-        foreach (var box in new[] { FromBox, ToBox })
-            box.PreviewMouseLeftButtonDown += ValueBox_PreviewMouseLeftButtonDown;
+        foreach (var box in new[] { FromBox, ToBox, DensityBox, MultiplierBox, InMinBox, InMaxBox, OutMinBox, OutMaxBox, ScaleInBox, ScaleOutBox })
+            box.PreviewMouseLeftButtonDown += TextBox_PreviewMouseLeftButtonDown;
 
-        CategoryBox.ItemsSource = Catalog.All;
-        CategoryBox.SelectedItem = Catalog.Find(settings.Category) ?? Catalog.Length;
+        // Parameters, filled before any mode is shown so the first calculation sees them.
+        _updating = true;
+        var culture = CultureInfo.CurrentCulture;
+        MultiplierBox.Text = Converter.Format(settings.Multiplier, culture);
+        MaterialBox.ItemsSource = Material.Common;
+        DensityUnitBox.ItemsSource = Catalog.Density.Units;
+        var densityUnit = Catalog.Density.Find(settings.DensityUnit) ?? Catalog.Density.DefaultFrom;
+        DensityUnitBox.SelectedItem = densityUnit;
+        DensityBox.Text = Converter.Format(densityUnit.FromBase(settings.DensityKgPerL), culture);
+        ScalePresetBox.ItemsSource = ScalePreset.Common;
+        InMinBox.Text = Converter.Format(settings.ScaleInMin, culture);
+        InMaxBox.Text = Converter.Format(settings.ScaleInMax, culture);
+        OutMinBox.Text = Converter.Format(settings.ScaleOutMin, culture);
+        OutMaxBox.Text = Converter.Format(settings.ScaleOutMax, culture);
+        ScaleInBox.Text = Converter.Format((settings.ScaleInMin + settings.ScaleInMax) / 2, culture);
         FromBox.Text = "1";
+        _updating = false;
+
+        ModeBox.ItemsSource = Mode.All;
+        ModeBox.SelectedItem = Mode.FindByName(settings.Category) ?? Mode.FindByName("Length");
 
         Loaded += (_, _) => PlaceDefaultIfNeeded();
     }
 
-    private Category Category => (Category)CategoryBox.SelectedItem;
+    private Mode Mode => (Mode)ModeBox.SelectedItem;
     private Unit? FromUnit => FromUnitBox.SelectedItem as Unit;
     private Unit? ToUnit => ToUnitBox.SelectedItem as Unit;
-    private TextBox Target => ReferenceEquals(_source, FromBox) ? ToBox : FromBox;
+    private static CultureInfo Culture => CultureInfo.CurrentCulture;
+
+    private TextBox Partner(TextBox box) =>
+        box == FromBox ? ToBox : box == ToBox ? FromBox : box == ScaleInBox ? ScaleOutBox : ScaleInBox;
+
+    private bool IsForward(TextBox box) => box == FromBox || box == ScaleInBox;
 
     // ---- Showing, hiding and exiting -------------------------------------------------
 
@@ -145,12 +170,14 @@ public partial class MainWindow : Window
         _positioned = true;
     }
 
+    /// <summary>Saves the window position along with everything else in settings.</summary>
     private void SavePosition()
     {
-        if (!_positioned)
-            return;
-        _settings.Left = Left;
-        _settings.Top = Top;
+        if (_positioned)
+        {
+            _settings.Left = Left;
+            _settings.Top = Top;
+        }
         _settings.Save();
     }
 
@@ -167,29 +194,46 @@ public partial class MainWindow : Window
         SavePosition();
     }
 
-    // ---- Conversion ------------------------------------------------------------------
+    // ---- Mode and parameter changes --------------------------------------------------
 
-    private void CategoryBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void ModeBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        var category = Category;
-        var from = category.DefaultFrom;
-        var to = category.DefaultTo;
-        if (_settings.Units.TryGetValue(category.Name, out var saved) && saved.Length == 2)
+        var mode = Mode;
+        UnitPanel.Visibility = mode.Kind == ModeKind.Scaling ? Visibility.Collapsed : Visibility.Visible;
+        DensityPanel.Visibility = mode.Kind == ModeKind.MassVolume ? Visibility.Visible : Visibility.Collapsed;
+        ScalePanel.Visibility = mode.Kind == ModeKind.Scaling ? Visibility.Visible : Visibility.Collapsed;
+
+        if (mode.Kind == ModeKind.Scaling)
         {
-            from = category.Find(saved[0]) ?? from;
-            to = category.Find(saved[1]) ?? to;
+            if (_source != ScaleInBox && _source != ScaleOutBox)
+                _source = ScaleInBox;
+        }
+        else
+        {
+            if (_source != FromBox && _source != ToBox)
+                _source = FromBox;
+
+            var from = mode.DefaultFrom;
+            var to = mode.DefaultTo;
+            if (_settings.Units.TryGetValue(mode.Name, out var saved) && saved.Length == 2)
+            {
+                from = mode.FindUnit(saved[0]) ?? from;
+                to = mode.FindUnit(saved[1]) ?? to;
+            }
+
+            _updating = true;
+            FromUnitBox.ItemsSource = mode.Units;
+            ToUnitBox.ItemsSource = mode.Units;
+            FromUnitBox.SelectedItem = from;
+            ToUnitBox.SelectedItem = to;
+            _updating = false;
         }
 
-        _updating = true;
-        FromUnitBox.ItemsSource = category.Units;
-        ToUnitBox.ItemsSource = category.Units;
-        FromUnitBox.SelectedItem = from;
-        ToUnitBox.SelectedItem = to;
-        _updating = false;
-
-        _settings.Category = category.Name;
-        _settings.Save();
+        _settings.Category = mode.Name;
         Recalculate();
+
+        if (IsVisible)
+            Dispatcher.BeginInvoke(() => { _source.Focus(); _source.SelectAll(); }, DispatcherPriority.Input);
     }
 
     private void UnitBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -200,98 +244,266 @@ public partial class MainWindow : Window
         Recalculate();
     }
 
-    private void FromBox_TextChanged(object sender, TextChangedEventArgs e) => OnUserTyped(FromBox);
-
-    private void ToBox_TextChanged(object sender, TextChangedEventArgs e) => OnUserTyped(ToBox);
-
-    private void OnUserTyped(TextBox box)
+    private void ValueBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         if (_updating)
             return;
-        _source = box;
+        _source = (TextBox)sender;
         Recalculate();
     }
 
+    private void MultiplierBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!_updating)
+            Recalculate();
+    }
+
+    private void DensityBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_updating)
+            return;
+        // A typed density no longer matches the chosen material.
+        _updating = true;
+        MaterialBox.SelectedItem = null;
+        _updating = false;
+        Recalculate();
+    }
+
+    private void DensityUnitBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updating || DensityUnitBox.SelectedItem is not Unit unit)
+            return;
+
+        // Keep the same physical density, shown in the new unit.
+        _settings.DensityUnit = unit.Symbol;
+        SetText(DensityBox, Converter.Format(unit.FromBase(_settings.DensityKgPerL), Culture));
+        Recalculate();
+    }
+
+    private void MaterialBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updating || MaterialBox.SelectedItem is not Material material || DensityUnitBox.SelectedItem is not Unit unit)
+            return;
+        SetText(DensityBox, Converter.Format(unit.FromBase(material.KgPerL), Culture));
+        Recalculate();
+    }
+
+    private void RangeBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_updating)
+            return;
+        _updating = true;
+        ScalePresetBox.SelectedItem = null;
+        _updating = false;
+        Recalculate();
+    }
+
+    private void ScalePresetBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updating || ScalePresetBox.SelectedItem is not ScalePreset preset)
+            return;
+        SetText(InMinBox, Converter.Format(preset.Min, Culture));
+        SetText(InMaxBox, Converter.Format(preset.Max, Culture));
+        Recalculate();
+    }
+
+    // ---- Calculation -----------------------------------------------------------------
+
     private void Recalculate()
+    {
+        if (ModeBox.SelectedItem is not Mode mode)
+            return;
+        if (mode.Kind == ModeKind.Scaling)
+            RecalculateScale();
+        else
+            RecalculateUnits(mode);
+    }
+
+    private void RecalculateUnits(Mode mode)
     {
         if (FromUnit is not { } from || ToUnit is not { } to)
             return;
+        ClearInvalid(MultiplierBox, DensityBox, FromBox, ToBox);
 
-        var culture = CultureInfo.CurrentCulture;
-        var target = Target;
-        string result;
+        if (!TryParse(MultiplierBox, out var multiplier, allowEmpty: true, emptyValue: 1) || multiplier == 0)
+        {
+            Fail(MultiplierBox, "Multiplier must be a non-zero number");
+            return;
+        }
+        _settings.Multiplier = multiplier;
 
-        if (string.IsNullOrWhiteSpace(_source.Text))
+        var density = 1.0;
+        if (mode.Kind == ModeKind.MassVolume)
         {
-            _source.Tag = null;
-            result = "";
-        }
-        else if (Converter.TryParse(_source.Text, culture, out var value))
-        {
-            _source.Tag = null;
-            var converted = ReferenceEquals(_source, FromBox)
-                ? Converter.Convert(value, from, to)
-                : Converter.Convert(value, to, from);
-            result = Converter.Format(converted, culture);
-        }
-        else
-        {
-            _source.Tag = "Invalid";
-            result = "";
+            var densityUnit = (Unit)DensityUnitBox.SelectedItem;
+            if (!TryParse(DensityBox, out var shown) || !(densityUnit.ToBase(shown) > 0))
+            {
+                Fail(DensityBox, "Density must be a positive number");
+                return;
+            }
+            density = densityUnit.ToBase(shown);
+            _settings.DensityKgPerL = density;
         }
 
-        target.Tag = null;
-        _updating = true;
-        target.Text = result;
-        _updating = false;
-        UpdateStatus();
+        double Convert(double value, Unit a, Unit b) => mode.Kind == ModeKind.MassVolume
+            ? MassVolume.Convert(value, a, b, density)
+            : Converter.Convert(value, a, b);
+
+        var target = Partner(_source);
+        if (!TryCompute(target, x => IsForward(_source)
+                ? Convert(x, from, to) * multiplier
+                : Convert(x / multiplier, to, from)))
+            return;
+
+        var rate = Converter.Format(Convert(1, from, to) * multiplier, Culture);
+        var suffix = multiplier == 1 ? "" : $"  (incl. ×{Converter.Format(multiplier, Culture)})";
+        SetStatus($"1 {from.Symbol} = {rate} {to.Symbol}{suffix}");
     }
 
-    private void UpdateStatus()
+    private void RecalculateScale()
     {
-        if (_statusTimer.IsEnabled || FromUnit is not { } from || ToUnit is not { } to)
-            return;
+        ClearInvalid(InMinBox, InMaxBox, OutMinBox, OutMaxBox, ScaleInBox, ScaleOutBox);
 
-        if (_source.Tag is "Invalid")
+        foreach (var box in new[] { InMinBox, InMaxBox, OutMinBox, OutMaxBox })
         {
-            StatusText.Text = "Enter a number";
+            if (!TryParse(box, out _))
+            {
+                Fail(box, "Enter the input and output min and max");
+                return;
+            }
+        }
+        TryParse(InMinBox, out var inMin);
+        TryParse(InMaxBox, out var inMax);
+        TryParse(OutMinBox, out var outMin);
+        TryParse(OutMaxBox, out var outMax);
+        var scale = new LinearScale(inMin, inMax, outMin, outMax);
+
+        (_settings.ScaleInMin, _settings.ScaleInMax, _settings.ScaleOutMin, _settings.ScaleOutMax) = (inMin, inMax, outMin, outMax);
+
+        if (!scale.CanScale)
+        {
+            Fail(InMaxBox, "Input min and max can't be equal");
+            return;
+        }
+        if (!IsForward(_source) && !scale.CanUnscale)
+        {
+            Fail(OutMaxBox, "Output min and max can't be equal");
             return;
         }
 
-        var culture = CultureInfo.CurrentCulture;
-        var rate = Converter.Format(Converter.Convert(1, from, to), culture);
-        StatusText.Text = $"1 {from.Symbol} = {rate} {to.Symbol}";
+        if (!TryCompute(Partner(_source), v => IsForward(_source) ? scale.Scale(v) : scale.Unscale(v)))
+            return;
+
+        // Warn when the input is outside its range, since the result is then extrapolated.
+        if (TryParse(ScaleInBox, out var input) && !scale.IsInputInRange(input))
+        {
+            SetStatus($"⚠ Input outside {Converter.Format(inMin, Culture)} – {Converter.Format(inMax, Culture)}, extrapolated");
+            return;
+        }
+
+        var offset = scale.Offset;
+        var sign = offset < 0 ? "−" : "+";
+        var offsetText = offset == 0 ? "" : $" {sign} {Converter.Format(Math.Abs(offset), Culture)}";
+        SetStatus($"Out = {Converter.Format(scale.Slope, Culture)} × In{offsetText}");
+    }
+
+    /// <summary>
+    /// Parses the source box and writes the result of <paramref name="compute"/> into <paramref name="target"/>.
+    /// Returns false when there is nothing valid to compute (and the status already says why).
+    /// </summary>
+    private bool TryCompute(TextBox target, Func<double, double> compute)
+    {
+        if (string.IsNullOrWhiteSpace(_source.Text))
+        {
+            SetText(target, "");
+            SetStatus("");
+            return false;
+        }
+        if (!TryParse(_source, out var value))
+        {
+            Fail(_source, "Enter a number");
+            return false;
+        }
+        SetText(target, Converter.Format(compute(value), Culture));
+        return true;
+    }
+
+    private static bool TryParse(TextBox box, out double value, bool allowEmpty = false, double emptyValue = 0)
+    {
+        if (allowEmpty && string.IsNullOrWhiteSpace(box.Text))
+        {
+            value = emptyValue;
+            return true;
+        }
+        return Converter.TryParse(box.Text, Culture, out value);
+    }
+
+    private void Fail(TextBox box, string message)
+    {
+        box.Tag = Invalid;
+        SetText(Partner(_source), "");
+        SetStatus(message);
+    }
+
+    private static void ClearInvalid(params TextBox[] boxes)
+    {
+        foreach (var box in boxes)
+            box.Tag = null;
+    }
+
+    private void SetText(TextBox box, string text)
+    {
+        _updating = true;
+        box.Text = text;
+        _updating = false;
+    }
+
+    private void SetStatus(string text)
+    {
+        _status = text;
+        if (!_flashTimer.IsEnabled)
+            StatusText.Text = text;
     }
 
     private void RememberUnits()
     {
-        _settings.Units[Category.Name] = [FromUnit!.Symbol, ToUnit!.Symbol];
-        _settings.Save();
+        _settings.Units[Mode.Name] = [FromUnit!.Symbol, ToUnit!.Symbol];
     }
+
+    // ---- Actions ---------------------------------------------------------------------
 
     private void Swap()
     {
-        if (FromUnit is not { } from || ToUnit is not { } to)
-            return;
+        if (Mode.Kind == ModeKind.Scaling)
+        {
+            _updating = true;
+            ScalePresetBox.SelectedItem = null;
+            (InMinBox.Text, OutMinBox.Text) = (OutMinBox.Text, InMinBox.Text);
+            (InMaxBox.Text, OutMaxBox.Text) = (OutMaxBox.Text, InMaxBox.Text);
+            (ScaleInBox.Text, ScaleOutBox.Text) = (ScaleOutBox.Text, ScaleInBox.Text);
+            _updating = false;
+        }
+        else
+        {
+            if (FromUnit is not { } from || ToUnit is not { } to)
+                return;
+            _updating = true;
+            FromUnitBox.SelectedItem = to;
+            ToUnitBox.SelectedItem = from;
+            (FromBox.Text, ToBox.Text) = (ToBox.Text, FromBox.Text);
+            _updating = false;
+            RememberUnits();
+        }
 
-        // Swapping both units and both values keeps the pair consistent, so nothing needs recomputing.
-        _updating = true;
-        FromUnitBox.SelectedItem = to;
-        ToUnitBox.SelectedItem = from;
-        (FromBox.Text, ToBox.Text) = (ToBox.Text, FromBox.Text);
-        (FromBox.Tag, ToBox.Tag) = (ToBox.Tag, FromBox.Tag);
-        _updating = false;
-
-        _source = Target;
-        RememberUnits();
-        UpdateStatus();
+        // The value the user typed moved to the other box; keep it as the source.
+        _source = Partner(_source);
+        Recalculate();
     }
 
     private void CopyResult()
     {
-        var target = Target;
-        var unit = ReferenceEquals(target, FromBox) ? FromUnit : ToUnit;
-        if (string.IsNullOrEmpty(target.Text) || unit is null)
+        var target = Partner(_source);
+        if (string.IsNullOrEmpty(target.Text))
             return;
 
         try
@@ -304,17 +516,18 @@ public partial class MainWindow : Window
             return;
         }
 
-        StatusText.Text = $"Copied {target.Text} {unit.Symbol}";
-        _statusTimer.Stop();
-        _statusTimer.Start();
+        var unit = target == FromBox ? FromUnit : target == ToBox ? ToUnit : null;
+        StatusText.Text = unit is null ? $"Copied {target.Text}" : $"Copied {target.Text} {unit.Symbol}";
+        _flashTimer.Stop();
+        _flashTimer.Start();
     }
 
     // ---- Input handling --------------------------------------------------------------
 
-    private void ValueBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) =>
+    private void TextBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) =>
         ((TextBox)sender).SelectAll();
 
-    private void ValueBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void TextBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         // First click selects the whole value so typing replaces it; later clicks place the caret.
         var box = (TextBox)sender;
@@ -330,15 +543,17 @@ public partial class MainWindow : Window
         base.OnPreviewKeyDown(e);
         var ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
         var shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        var anyDropDownOpen = new[] { ModeBox, FromUnitBox, ToUnitBox, DensityUnitBox, MaterialBox, ScalePresetBox }
+            .Any(c => c.IsDropDownOpen);
 
-        if (e.Key == Key.Escape && !CategoryBox.IsDropDownOpen && !FromUnitBox.IsDropDownOpen && !ToUnitBox.IsDropDownOpen)
+        if (e.Key == Key.Escape && !anyDropDownOpen)
         {
             HideWidget();
             e.Handled = true;
         }
-        else if (ctrl && !shift && e.Key is >= Key.D1 and <= Key.D9 && e.Key - Key.D1 < Catalog.All.Count)
+        else if (ctrl && !shift && e.Key is >= Key.D1 and <= Key.D9 && e.Key - Key.D1 < Mode.All.Count)
         {
-            CategoryBox.SelectedItem = Catalog.All[e.Key - Key.D1];
+            ModeBox.SelectedItem = Mode.All[e.Key - Key.D1];
             e.Handled = true;
         }
         else if (ctrl && !shift && e.Key == Key.R)

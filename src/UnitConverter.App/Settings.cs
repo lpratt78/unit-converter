@@ -19,6 +19,18 @@ public sealed class Settings
     /// <summary>Last chosen [from, to] unit symbols, keyed by category name.</summary>
     public Dictionary<string, string[]> Units { get; set; } = new();
 
+    /// <summary>Applied to every unit conversion result; 1 means off.</summary>
+    public double Multiplier { get; set; } = 1;
+
+    /// <summary>Density for mass/volume conversions, always stored in kg/L.</summary>
+    public double DensityKgPerL { get; set; } = 1;
+    public string DensityUnit { get; set; } = "kg/L";
+
+    public double ScaleInMin { get; set; } = 4;
+    public double ScaleInMax { get; set; } = 20;
+    public double ScaleOutMin { get; set; } = 0;
+    public double ScaleOutMax { get; set; } = 100;
+
     public bool TrayHintShown { get; set; }
 
     public static Settings Load()

@@ -110,8 +110,48 @@ public static class Catalog
         Unit.Linear("Tebibyte", "TiB", 1099511627776),
     ], "GB", "GiB");
 
+    // Base unit: pascal.
+    public static Category Pressure { get; } = new("Pressure",
+    [
+        Unit.Linear("Pascal", "Pa", 1),
+        Unit.Linear("Kilopascal", "kPa", 1e3),
+        Unit.Linear("Megapascal", "MPa", 1e6),
+        Unit.Linear("Millibar", "mbar", 100),
+        Unit.Linear("Bar", "bar", 1e5),
+        Unit.Linear("Pound per square inch", "psi", 6894.757293168361),
+        Unit.Linear("Atmosphere", "atm", 101325),
+        Unit.Linear("Kilogram-force per cm²", "kgf/cm²", 98066.5),
+        Unit.Linear("Inch of water (4 °C)", "inH₂O", 249.08891),
+        Unit.Linear("Inch of mercury (0 °C)", "inHg", 3386.389),
+        Unit.Linear("Millimetre of mercury", "mmHg", 133.322387415),
+    ], "psi", "bar");
+
+    // Base unit: cubic metre per second.
+    public static Category Flow { get; } = new("Flow",
+    [
+        Unit.Linear("Litre per second", "L/s", 1e-3),
+        Unit.Linear("Litre per minute", "L/min", 1e-3 / 60),
+        Unit.Linear("Litre per hour", "L/h", 1e-3 / 3600),
+        Unit.Linear("Cubic metre per hour", "m³/h", 1.0 / 3600),
+        Unit.Linear("Cubic metre per second", "m³/s", 1),
+        Unit.Linear("US gallon per minute", "GPM", 3.785411784e-3 / 60),
+        Unit.Linear("US gallon per hour", "GPH", 3.785411784e-3 / 3600),
+        Unit.Linear("Cubic foot per minute", "CFM", 0.028316846592 / 60),
+    ], "GPM", "L/min");
+
+    // Base unit: kilogram per litre. Specific gravity is taken relative to 1 kg/L.
+    public static Category Density { get; } = new("Density",
+    [
+        Unit.Linear("Kilogram per litre", "kg/L", 1),
+        Unit.Linear("Gram per cubic centimetre", "g/cm³", 1),
+        Unit.Linear("Kilogram per cubic metre", "kg/m³", 1e-3),
+        Unit.Linear("Pound per US gallon", "lb/gal", 0.45359237 / 3.785411784),
+        Unit.Linear("Pound per cubic foot", "lb/ft³", 0.45359237 / 28.316846592),
+        Unit.Linear("Specific gravity", "SG", 1),
+    ], "kg/L", "lb/gal");
+
     public static IReadOnlyList<Category> All { get; } =
-        [Length, Mass, Temperature, Volume, Area, Speed, Time, Data];
+        [Length, Mass, Volume, Temperature, Pressure, Flow, Density, Area, Speed, Time, Data];
 
     public static Category? Find(string name) =>
         All.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));

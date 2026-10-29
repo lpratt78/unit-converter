@@ -142,6 +142,10 @@
                                               HorizontalAlignment="Stretch"
                                               Content="{TemplateBinding SelectionBoxItem}"
                                               ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" />
+                            <TextBlock x:Name="Placeholder" Visibility="Collapsed" IsHitTestVisible="False"
+                                       Margin="10,0,26,0" VerticalAlignment="Center"
+                                       Foreground="{StaticResource SubtleBrush}"
+                                       Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" />
                             <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
                                    VerticalOffset="4" AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
                                 <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource OutlineBrush}"
@@ -154,9 +158,26 @@
                                 </Border>
                             </Popup>
                         </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="SelectedItem" Value="{x:Null}">
+                                <Setter TargetName="Placeholder" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <!-- Compact input for parameters (density, multiplier, ranges) -->
+        <Style x:Key="SmallBox" TargetType="TextBox" BasedOn="{StaticResource ValueBox}">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Height" Value="32" />
+        </Style>
+
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource SubtleBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
 
     </Application.Resources>
