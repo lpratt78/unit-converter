@@ -30,6 +30,8 @@ Every push to `main` builds `UnitConverter.exe` in GitHub Actions (see the run's
 
 Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) on Windows.
 
+**Easiest:** double-click `Build UnitConverter.exe.bat`. It closes any running copy, builds `publish\UnitConverter.exe`, starts it and opens the folder. Run it again after each update.
+
 ```powershell
 dotnet test tests/UnitConverter.Tests
 dotnet run --project src/UnitConverter.App
