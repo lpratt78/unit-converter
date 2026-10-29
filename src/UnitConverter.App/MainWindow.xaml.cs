@@ -521,15 +521,15 @@ public partial class MainWindow : Window
         Recalculate();
     }
 
+    /// <summary>Copies the status line text (the rate or scaling formula) to the clipboard.</summary>
     private void CopyResult()
     {
-        var target = Partner(_source);
-        if (string.IsNullOrEmpty(target.Text))
+        if (string.IsNullOrEmpty(_status))
             return;
 
         try
         {
-            Clipboard.SetText(target.Text);
+            Clipboard.SetText(_status);
         }
         catch (System.Runtime.InteropServices.COMException)
         {
@@ -537,8 +537,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var unit = target == FromBox ? FromUnit : target == ToBox ? ToUnit : null;
-        StatusText.Text = unit is null ? $"Copied {target.Text}" : $"Copied {target.Text} {unit.Symbol}";
+        StatusText.Text = "Copied ✓";
         _flashTimer.Stop();
         _flashTimer.Start();
     }

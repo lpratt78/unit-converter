@@ -17,7 +17,7 @@ A small, always-on-top unit converter widget for Windows 10 and 11.
 | `Ctrl+Alt+U` | Show / hide the widget (works from any app) |
 | `Ctrl+1` … `Ctrl+9` | Switch mode (1 = Scaling, 2 = Mass ↔ Volume, 3 = Length, …) |
 | `Ctrl+R` | Swap units (in Scaling, swaps the Input 1 and Input 2 ranges) |
-| `Ctrl+Shift+C` | Copy the converted value |
+| `Ctrl+Shift+C` | Copy the bottom line (e.g. `1 gal = 8.34 lb` or the scaling formula) |
 | `Esc` | Hide to tray |
 
 Drag the widget by any empty area. The pin button toggles always-on-top. To quit, right-click the tray icon and choose **Exit**.
