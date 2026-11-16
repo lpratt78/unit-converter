@@ -28,7 +28,9 @@ Drag the widget by any empty area. The pin button toggles always-on-top. To quit
 
 ## Download
 
-Every push to `main` builds `UnitConverter.exe` in GitHub Actions (see the run's **Artifacts**). Pushing a tag such as `v1.0.0` also attaches the exe to a GitHub release. It is a single self-contained file, so no .NET install is needed.
+**[Download UnitConverter.exe](https://github.com/lpratt78/unit-converter/releases/latest/download/UnitConverter.exe)** (Windows 10/11, x64). It is a single self-contained file, so no .NET install is needed. Every push to `main` builds a new numbered release.
+
+Windows SmartScreen may warn the first time because the exe isn't code-signed: click **More info → Run anyway**.
 
 ## Build it yourself
 
