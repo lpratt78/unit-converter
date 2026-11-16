@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Unit Converter</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Unit converter for PLC work: analog scaling, mass/volume by weight per gallon, and everyday units.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1f2329">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one compact instrument panel, centred, sized for a phone or a narrow desktop window. */
+:root {
+  --bg: #e9edf2;
+  --panel: #ffffff;
+  --field: #f3f5f8;
+  --line: #ccd4de;
+  --fg: #17212c;
+  --muted: #5b6878;
+  --accent: #1f6fd6;
+  --accent-ink: #ffffff;
+  --warn: #a8530a;
+  --bad: #c22f2f;
+  --font-ui: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --radius: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14171c; --panel: #1f2329; --field: #2a2f37; --line: #3b424c;
+    --fg: #eef1f5; --muted: #9aa4b0; --accent: #5aa2ff; --accent-ink: #0d1520;
+    --warn: #f0a050; --bad: #ff7272; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14171c; --panel: #1f2329; --field: #2a2f37; --line: #3b424c;
+  --fg: #eef1f5; --muted: #9aa4b0; --accent: #5aa2ff; --accent-ink: #0d1520;
+  --warn: #f0a050; --bad: #ff7272; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.4 var(--font-ui);
+  padding-block: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.app {
+  max-width: 420px;
+  margin: 0 auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+header { display: flex; flex-direction: column; gap: 10px; }
+h1 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+h1 img { width: 18px; height: 18px; }
+
+/* Mode switch */
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 3px;
+  gap: 3px;
+}
+.tabs button {
+  font: 500 14px var(--font-ui);
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 4px;
+  cursor: pointer;
+}
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+.tabs button:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+section { display: flex; flex-direction: column; gap: 10px; }
+
+label.cap, .cap {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+input[type="text"], select {
+  font: inherit;
+  color: var(--fg);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  min-width: 0;
+  width: 100%;
+}
+input[type="text"] {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  padding: 7px 10px;
+}
+input[type="text"].big { font-size: 22px; padding: 8px 12px; }
+input[type="text"][aria-invalid="true"] { border-color: var(--bad); }
+select { padding: 8px 10px; cursor: pointer; }
+
+/* Range table: label | min | max */
+.ranges {
+  display: grid;
+  grid-template-columns: 78px 1fr 1fr;
+  gap: 6px 8px;
+  align-items: center;
+}
+.ranges .head { padding-left: 2px; }
+.ranges .preset { grid-column: 2 / 4; }
+.ranges .spacer { grid-column: 1 / -1; height: 4px; }
+
+.pair { display: grid; grid-template-columns: 1fr 150px; gap: 8px; }
+.row { display: grid; grid-template-columns: 78px 1fr; gap: 8px; align-items: center; }
+
+.swap {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 13px var(--font-ui);
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.swap:hover { color: var(--fg); border-color: var(--muted); }
+
+/* Input 1 slider with 0/25/50/75/100 % ticks */
+.slider { display: flex; flex-direction: column; gap: 4px; }
+.slider input[type="range"] {
+  --pct: 50%;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  background: transparent;
+  margin: 0;
+  cursor: pointer;
+}
+.slider input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px; border-radius: 3px;
+  background: linear-gradient(to right, var(--accent) var(--pct), var(--line) var(--pct));
+}
+.slider input[type="range"]::-moz-range-track {
+  height: 6px; border-radius: 3px;
+  background: linear-gradient(to right, var(--accent) var(--pct), var(--line) var(--pct));
+}
+.slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px; margin-top: -6px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 4px solid var(--accent);
+}
+.slider input[type="range"]::-moz-range-thumb {
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 4px solid var(--accent);
+}
+.ticks {
+  position: relative;
+  height: 6px;
+  margin: 0 9px;
+}
+.ticks span {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 6px;
+  background: var(--line);
+}
+.scale-labels {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  font: 12px var(--font-num);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.scale-labels :nth-child(2) { color: var(--fg); }
+.scale-labels :last-child { text-align: right; }
+
+/* Status line: the rate or formula, copyable */
+footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+#status {
+  flex: 1;
+  min-width: 0;
+  font: 13px var(--font-num);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+#status.warn { color: var(--warn); }
+#status.bad { color: var(--bad); }
+#copy {
+  flex: none;
+  font: 500 13px var(--font-ui);
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius);
+  padding: 7px 14px;
+  cursor: pointer;
+}
+
+.note { margin: 0; font-size: 12px; color: var(--muted); text-align: center; }
+
+@media (max-width: 380px) {
+  .pair { grid-template-columns: 1fr 120px; }
+  .ranges { grid-template-columns: 72px 1fr 1fr; }
+  .row { grid-template-columns: 72px 1fr; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tabs button, .swap, #copy { transition: background-color 120ms, color 120ms, border-color 120ms; }
+}
+</style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <h1><img src="icons/favicon-32.png" alt="">Unit Converter</h1>
+    <div class="tabs" role="tablist" aria-label="Mode">
+      <button id="tab-scaling" role="tab" data-mode="scaling" aria-controls="scaling">Scaling</button>
+      <button id="tab-massvol" role="tab" data-mode="massvol" aria-controls="massvol">Mass ↔ Vol</button>
+      <button id="tab-units" role="tab" data-mode="units" aria-controls="units">Units</button>
+    </div>
+  </header>
+
+  <!-- Scaling: Input 1 range → Input 2 range -->
+  <section id="scaling" role="tabpanel" aria-labelledby="tab-scaling">
+    <div class="ranges">
+      <span></span><span class="cap head">Min</span><span class="cap head">Max</span>
+      <label class="cap" for="in-min">Input 1</label>
+      <input type="text" id="in-min" inputmode="decimal" autocomplete="off" aria-label="Input 1 min">
+      <input type="text" id="in-max" inputmode="decimal" autocomplete="off" aria-label="Input 1 max">
+      <span></span>
+      <select id="preset" class="preset" aria-label="Input 1 range preset"></select>
+      <div class="spacer"></div>
+      <label class="cap" for="out-min">Input 2</label>
+      <input type="text" id="out-min" inputmode="decimal" autocomplete="off" aria-label="Input 2 min">
+      <input type="text" id="out-max" inputmode="decimal" autocomplete="off" aria-label="Input 2 max">
+    </div>
+
+    <div class="row">
+      <label class="cap" for="scale-in">Input 1</label>
+      <input type="text" id="scale-in" class="big" inputmode="decimal" autocomplete="off">
+    </div>
+    <div class="row">
+      <span></span>
+      <div class="slider">
+        <input type="range" id="scale-slider" min="0" max="100" step="any" aria-label="Adjust Input 1">
+        <div class="ticks" aria-hidden="true"><span style="left:0"></span><span style="left:25%"></span><span style="left:50%"></span><span style="left:75%"></span><span style="left:100%"></span></div>
+        <div class="scale-labels"><span id="sl-min"></span><span id="sl-pct"></span><span id="sl-max"></span></div>
+      </div>
+    </div>
+    <button class="swap" id="scale-swap" type="button" title="Swap the Input 1 and Input 2 ranges">⇅ Swap ranges</button>
+    <div class="row">
+      <label class="cap" for="scale-out">Input 2</label>
+      <input type="text" id="scale-out" class="big" inputmode="decimal" autocomplete="off">
+    </div>
+  </section>
+
+  <!-- Mass ↔ Volume by weight per volume -->
+  <section id="massvol" role="tabpanel" aria-labelledby="tab-massvol" hidden>
+    <div class="pair">
+      <input type="text" id="mv-from" class="big" inputmode="decimal" autocomplete="off" aria-label="From value">
+      <select id="mv-from-unit" aria-label="From unit"></select>
+    </div>
+    <button class="swap" id="mv-swap" type="button">⇅ Swap</button>
+    <div class="pair">
+      <input type="text" id="mv-to" class="big" inputmode="decimal" autocomplete="off" aria-label="To value">
+      <select id="mv-to-unit" aria-label="To unit"></select>
+    </div>
+    <div class="row" style="margin-top:4px">
+      <label class="cap" for="wf">Multiplier</label>
+      <div class="pair" style="grid-template-columns: 1fr 110px">
+        <input type="text" id="wf" inputmode="decimal" autocomplete="off" title="Weight per volume, e.g. water 8.34 lb/gal">
+        <select id="wf-unit" aria-label="Multiplier unit"></select>
+      </div>
+    </div>
+    <div class="row">
+      <span></span>
+      <select id="material" aria-label="Material preset"></select>
+    </div>
+  </section>
+
+  <!-- Everyday units -->
+  <section id="units" role="tabpanel" aria-labelledby="tab-units" hidden>
+    <select id="category" aria-label="Category"></select>
+    <div class="pair">
+      <input type="text" id="u-from" class="big" inputmode="decimal" autocomplete="off" aria-label="From value">
+      <select id="u-from-unit" aria-label="From unit"></select>
+    </div>
+    <button class="swap" id="u-swap" type="button">⇅ Swap</button>
+    <div class="pair">
+      <input type="text" id="u-to" class="big" inputmode="decimal" autocomplete="off" aria-label="To value">
+      <select id="u-to-unit" aria-label="To unit"></select>
+    </div>
+  </section>
+
+  <footer>
+    <div id="status" aria-live="polite"></div>
+    <button id="copy" type="button" title="Copy the text on the left">Copy</button>
+  </footer>
+</main>
+<p class="note"><button id="install" class="swap" type="button" hidden>Install as an app</button></p>
+
+<script>
+"use strict";
+
+// ---- Units (same factors as the Windows app's Catalog.cs) ------------------------
+const lin = (name, sym, f) => ({ name, sym, toBase: v => v * f, fromBase: v => v / f });
+const LB_PER_GAL = 0.45359237 / 3.785411784;
+
+const CATEGORIES = [
+  { name: "Length", from: "cm", to: "in", units: [
+    lin("Micrometre", "µm", 1e-6), lin("Millimetre", "mm", 1e-3), lin("Centimetre", "cm", 1e-2),
+    lin("Metre", "m", 1), lin("Kilometre", "km", 1e3), lin("Inch", "in", 0.0254), lin("Foot", "ft", 0.3048),
+    lin("Yard", "yd", 0.9144), lin("Mile", "mi", 1609.344), lin("Nautical mile", "nmi", 1852)] },
+  { name: "Mass", from: "kg", to: "lb", units: [
+    lin("Milligram", "mg", 1e-6), lin("Gram", "g", 1e-3), lin("Kilogram", "kg", 1), lin("Tonne", "t", 1e3),
+    lin("Ounce", "oz", 0.028349523125), lin("Pound", "lb", 0.45359237), lin("Stone", "st", 6.35029318),
+    lin("US ton", "ton", 907.18474)] },
+  { name: "Volume", from: "L", to: "gal", units: [
+    lin("Millilitre", "mL", 1e-3), lin("Litre", "L", 1), lin("Cubic metre", "m³", 1e3),
+    lin("Teaspoon (US)", "tsp", 0.00492892159375), lin("Tablespoon (US)", "tbsp", 0.01478676478125),
+    lin("Fluid ounce (US)", "fl oz", 0.0295735295625), lin("Cup (US)", "cup", 0.2365882365),
+    lin("Pint (US)", "pt", 0.473176473), lin("Quart (US)", "qt", 0.946352946), lin("Gallon (US)", "gal", 3.785411784),
+    lin("Gallon (UK)", "gal UK", 4.54609), lin("Cubic inch", "in³", 0.016387064), lin("Cubic foot", "ft³", 28.316846592)] },
+  { name: "Temperature", from: "°C", to: "°F", units: [
+    { name: "Celsius", sym: "°C", toBase: c => c + 273.15, fromBase: k => k - 273.15 },
+    { name: "Fahrenheit", sym: "°F", toBase: f => (f - 32) * 5 / 9 + 273.15, fromBase: k => (k - 273.15) * 9 / 5 + 32 },
+    { name: "Kelvin", sym: "K", toBase: k => k, fromBase: k => k }] },
+  { name: "Pressure", from: "psi", to: "bar", units: [
+    lin("Pascal", "Pa", 1), lin("Kilopascal", "kPa", 1e3), lin("Megapascal", "MPa", 1e6), lin("Millibar", "mbar", 100),
+    lin("Bar", "bar", 1e5), lin("Pound per sq inch", "psi", 6894.757293168361), lin("Atmosphere", "atm", 101325),
+    lin("Kilogram-force per cm²", "kgf/cm²", 98066.5), lin("Inch of water (4 °C)", "inH₂O", 249.08891),
+    lin("Inch of mercury (0 °C)", "inHg", 3386.389), lin("Millimetre of mercury", "mmHg", 133.322387415)] },
+  { name: "Flow", from: "GPM", to: "L/min", units: [
+    lin("Litre per second", "L/s", 1e-3), lin("Litre per minute", "L/min", 1e-3 / 60), lin("Litre per hour", "L/h", 1e-3 / 3600),
+    lin("Cubic metre per hour", "m³/h", 1 / 3600), lin("Cubic metre per second", "m³/s", 1),
+    lin("US gallon per minute", "GPM", 3.785411784e-3 / 60), lin("US gallon per hour", "GPH", 3.785411784e-3 / 3600),
+    lin("Cubic foot per minute", "CFM", 0.028316846592 / 60)] },
+  { name: "Density", from: "kg/L", to: "lb/gal", units: [
+    lin("Kilogram per litre", "kg/L", 1), lin("Gram per cm³", "g/cm³", 1), lin("Kilogram per m³", "kg/m³", 1e-3),
+    lin("Pound per US gallon", "lb/gal", LB_PER_GAL), lin("Pound per cubic foot", "lb/ft³", 0.45359237 / 28.316846592),
+    lin("Specific gravity", "SG", 1)] },
+  { name: "Area", from: "m²", to: "ft²", units: [
+    lin("Square centimetre", "cm²", 1e-4), lin("Square metre", "m²", 1), lin("Hectare", "ha", 1e4), lin("Square kilometre", "km²", 1e6),
+    lin("Square inch", "in²", 0.00064516), lin("Square foot", "ft²", 0.09290304), lin("Square yard", "yd²", 0.83612736),
+    lin("Acre", "ac", 4046.8564224), lin("Square mile", "mi²", 2589988.110336)] },
+  { name: "Speed", from: "km/h", to: "mph", units: [
+    lin("Metre per second", "m/s", 1), lin("Kilometre per hour", "km/h", 1 / 3.6), lin("Mile per hour", "mph", 0.44704),
+    lin("Knot", "kn", 1852 / 3600), lin("Foot per second", "ft/s", 0.3048)] },
+  { name: "Time", from: "h", to: "min", units: [
+    lin("Millisecond", "ms", 1e-3), lin("Second", "s", 1), lin("Minute", "min", 60), lin("Hour", "h", 3600),
+    lin("Day", "d", 86400), lin("Week", "wk", 604800), lin("Month (avg)", "mo", 2629746), lin("Year (avg)", "yr", 31556952)] },
+  { name: "Data", from: "GB", to: "GiB", units: [
+    lin("Bit", "bit", 0.125), lin("Byte", "B", 1), lin("Kilobyte", "KB", 1e3), lin("Megabyte", "MB", 1e6),
+    lin("Gigabyte", "GB", 1e9), lin("Terabyte", "TB", 1e12), lin("Kibibyte", "KiB", 1024), lin("Mebibyte", "MiB", 1048576),
+    lin("Gibibyte", "GiB", 1073741824), lin("Tebibyte", "TiB", 1099511627776)] },
+];
+const cat = name => CATEGORIES.find(c => c.name === name);
+const MASS = cat("Mass"), VOLUME = cat("Volume"), DENSITY = cat("Density");
+const MV_UNITS = [...VOLUME.units, ...MASS.units];
+const isMass = u => MASS.units.includes(u);
+
+const MATERIALS = [
+  ["Water", 8.34 * LB_PER_GAL], ["Liquid egg", 8.64 * LB_PER_GAL], ["Milk", 1.03], ["Seawater", 1.025],
+  ["Ethanol", 0.789], ["Gasoline", 0.745], ["Diesel", 0.832], ["Hydraulic oil", 0.87],
+  ["Glycol 50% / water", 1.07], ["Sulfuric acid 98%", 1.84], ["Sodium hydroxide 50%", 1.52],
+].map(([name, kgPerL]) => ({ name, kgPerL }));
+
+const PRESETS = [
+  ["4–20 mA", 4, 20], ["0–20 mA", 0, 20], ["0–10 V", 0, 10], ["±10 V", -10, 10], ["1–5 V", 1, 5],
+  ["0–100 %", 0, 100], ["Siemens 0–27648", 0, 27648], ["Siemens ±27648", -27648, 27648],
+  ["0–32767", 0, 32767], ["12-bit 0–4095", 0, 4095], ["16-bit 0–65535", 0, 65535],
+];
+
+// ---- Numbers --------------------------------------------------------------------
+function parse(text) {
+  const t = String(text ?? "").trim().replace(/[\s,]/g, "");
+  if (!t) return null;
+  if (!/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(t)) return NaN;
+  return Number(t);
+}
+function fmt(v) {
+  if (!Number.isFinite(v)) return "—";
+  const r = Number(v.toPrecision(10)); // snap float noise like 0.30000000000000004
+  if (r === 0) return "0";
+  const m = Math.abs(r);
+  if (m >= 1e15 || m < 1e-6)
+    return r.toExponential(9).replace(/\.?0+e/, "e").replace("e", "E");
+  return r.toLocaleString("en-US", { maximumFractionDigits: 10 });
+}
+const convert = (v, a, b) => (a === b ? v : b.fromBase(a.toBase(v)));
+function convertMV(v, a, b, kgPerL) {
+  if (isMass(a) === isMass(b)) return convert(v, a, b);
+  const base = a.toBase(v); // kg or L
+  return b.fromBase(isMass(a) ? base / kgPerL : base * kgPerL);
+}
+
+// ---- Saved state (per browser) ----------------------------------------------------
+const DEFAULTS = {
+  mode: "scaling", category: "Length", units: {},
+  wfKgPerL: 8.34 * LB_PER_GAL, wfUnit: "lb/gal",
+  inMin: 4, inMax: 20, outMin: 0, outMax: 100, scaleIn: 12,
+};
+let state = { ...DEFAULTS };
+try { Object.assign(state, JSON.parse(localStorage.getItem("unit-converter") || "{}")); } catch (e) {}
+function save() { try { localStorage.setItem("unit-converter", JSON.stringify(state)); } catch (e) {} }
+
+// ---- Elements -------------------------------------------------------------------
+const $ = id => document.getElementById(id);
+const el = {
+  status: $("status"), copy: $("copy"),
+  inMin: $("in-min"), inMax: $("in-max"), outMin: $("out-min"), outMax: $("out-max"), preset: $("preset"),
+  scaleIn: $("scale-in"), scaleOut: $("scale-out"), slider: $("scale-slider"),
+  slMin: $("sl-min"), slMax: $("sl-max"), slPct: $("sl-pct"),
+  mvFrom: $("mv-from"), mvTo: $("mv-to"), mvFromUnit: $("mv-from-unit"), mvToUnit: $("mv-to-unit"),
+  wf: $("wf"), wfUnit: $("wf-unit"), material: $("material"),
+  category: $("category"), uFrom: $("u-from"), uTo: $("u-to"), uFromUnit: $("u-from-unit"), uToUnit: $("u-to-unit"),
+};
+// The box the user last typed in, per mode; its partner shows the result.
+const source = { scaling: el.scaleIn, massvol: el.mvFrom, units: el.uFrom };
+const partner = { "scale-in": el.scaleOut, "scale-out": el.scaleIn, "mv-from": el.mvTo, "mv-to": el.mvFrom, "u-from": el.uTo, "u-to": el.uFrom };
+
+function fillSelect(select, items, label, placeholder) {
+  select.innerHTML = "";
+  if (placeholder) select.add(new Option(placeholder, ""));
+  items.forEach((item, i) => select.add(new Option(label(item), String(i))));
+}
+const unitLabel = u => `${u.sym} · ${u.name}`;
+
+function setStatus(text, kind = "") {
+  el.status.textContent = text;
+  el.status.className = kind;
+}
+function invalid(input, on) { input.setAttribute("aria-invalid", on ? "true" : "false"); }
+
+// ---- Scaling ----------------------------------------------------------------------
+function calcScaling() {
+  const boxes = [el.inMin, el.inMax, el.outMin, el.outMax, el.scaleIn, el.scaleOut];
+  boxes.forEach(b => invalid(b, false));
+  const [inMin, inMax, outMin, outMax] = [el.inMin, el.inMax, el.outMin, el.outMax].map(b => parse(b.value));
+  const bad = [el.inMin, el.inMax, el.outMin, el.outMax].find(b => !Number.isFinite(parse(b.value)));
+  const src = source.scaling, dst = partner[src.id];
+  if (bad) { invalid(bad, true); dst.value = ""; return setStatus("Enter the Input 1 and Input 2 min and max", "bad"); }
+  Object.assign(state, { inMin, inMax, outMin, outMax });
+  if (inMin === inMax) { invalid(el.inMax, true); dst.value = ""; return setStatus("Input 1 min and max can't be equal", "bad"); }
+  if (src === el.scaleOut && outMin === outMax) { invalid(el.outMax, true); dst.value = ""; return setStatus("Input 2 min and max can't be equal", "bad"); }
+
+  const v = parse(src.value);
+  if (v === null) { dst.value = ""; setStatus(""); syncSlider(inMin, inMax, null); return; }
+  if (Number.isNaN(v)) { invalid(src, true); dst.value = ""; return setStatus("Enter a number", "bad"); }
+
+  const slope = (outMax - outMin) / (inMax - inMin);
+  const input = src === el.scaleIn ? v : inMin + (v - outMin) / slope;
+  if (src === el.scaleIn) el.scaleOut.value = fmt(outMin + (v - inMin) * slope);
+  else el.scaleIn.value = fmt(input);
+  state.scaleIn = input;
+  syncSlider(inMin, inMax, input);
+
+  const lo = Math.min(inMin, inMax), hi = Math.max(inMin, inMax);
+  if (input < lo || input > hi)
+    return setStatus(`⚠ Input 1 outside ${fmt(lo)} – ${fmt(hi)}, extrapolated`, "warn");
+  const offset = outMin - slope * inMin;
+  const off = offset === 0 ? "" : ` ${offset < 0 ? "−" : "+"} ${fmt(Math.abs(offset))}`;
+  setStatus(`Input 2 = ${fmt(slope)} × Input 1${off}`);
+}
+
+function syncSlider(inMin, inMax, input) {
+  const lo = Math.min(inMin, inMax), hi = Math.max(inMin, inMax);
+  el.slMin.textContent = fmt(lo);
+  el.slMax.textContent = fmt(hi);
+  el.slider.min = lo;
+  el.slider.max = hi;
+  if (input === null) { el.slPct.textContent = ""; return; }
+  const clamped = Math.min(hi, Math.max(lo, input));
+  el.slider.value = clamped;
+  el.slider.style.setProperty("--pct", `${((clamped - lo) / (hi - lo)) * 100}%`);
+  el.slPct.textContent = `${fmt(Math.round(((input - inMin) / (inMax - inMin)) * 1000) / 10)} %`;
+}
+
+el.slider.addEventListener("input", () => {
+  const lo = Number(el.slider.min), hi = Number(el.slider.max), range = hi - lo;
+  if (!(range > 0)) return;
+  // Round to about a thousandth of the span: 4–20 gives 12.34, 0–27648 gives whole counts.
+  const decimals = Math.min(10, Math.max(0, 3 - Math.floor(Math.log10(range))));
+  el.scaleIn.value = fmt(Number(Number(el.slider.value).toFixed(decimals)));
+  source.scaling = el.scaleIn;
+  calcScaling(); save();
+});
+[el.scaleIn, el.scaleOut].forEach(b => b.addEventListener("input", () => { source.scaling = b; calcScaling(); save(); }));
+[el.inMin, el.inMax, el.outMin, el.outMax].forEach(b => b.addEventListener("input", () => {
+  el.preset.value = "";
+  calcScaling(); save();
+}));
+el.preset.addEventListener("change", () => {
+  const p = PRESETS[Number(el.preset.value)];
+  if (!p) return;
+  el.inMin.value = fmt(p[1]);
+  el.inMax.value = fmt(p[2]);
+  calcScaling(); save();
+});
+$("scale-swap").addEventListener("click", () => {
+  [el.inMin.value, el.outMin.value] = [el.outMin.value, el.inMin.value];
+  [el.inMax.value, el.outMax.value] = [el.outMax.value, el.inMax.value];
+  [el.scaleIn.value, el.scaleOut.value] = [el.scaleOut.value, el.scaleIn.value];
+  el.preset.value = "";
+  source.scaling = partner[source.scaling.id];
+  calcScaling(); save();
+});
+
+// ---- Mass ↔ Volume -----------------------------------------------------------------
+const mvUnit = sel => MV_UNITS[Number(sel.value)];
+const wfUnit = () => DENSITY.units[Number(el.wfUnit.value)];
+
+function calcMassVol() {
+  [el.mvFrom, el.mvTo, el.wf].forEach(b => invalid(b, false));
+  const src = source.massvol, dst = partner[src.id];
+  const shown = parse(el.wf.value);
+  const kgPerL = Number.isFinite(shown) ? wfUnit().toBase(shown) : NaN;
+  if (!(kgPerL > 0)) { invalid(el.wf, true); dst.value = ""; return setStatus("Multiplier must be a positive number", "bad"); }
+  state.wfKgPerL = kgPerL;
+
+  const from = mvUnit(el.mvFromUnit), to = mvUnit(el.mvToUnit);
+  state.units.massvol = [from.sym, to.sym];
+  const v = parse(src.value);
+  if (v === null) { dst.value = ""; return setStatus(""); }
+  if (Number.isNaN(v)) { invalid(src, true); dst.value = ""; return setStatus("Enter a number", "bad"); }
+  dst.value = fmt(src === el.mvFrom ? convertMV(v, from, to, kgPerL) : convertMV(v, to, from, kgPerL));
+  setStatus(`${fmt(parse(el.mvFrom.value))} ${from.sym} = ${el.mvTo.value} ${to.sym}`);
+}
+
+[el.mvFrom, el.mvTo].forEach(b => b.addEventListener("input", () => { source.massvol = b; calcMassVol(); save(); }));
+[el.mvFromUnit, el.mvToUnit].forEach(s => s.addEventListener("change", () => { calcMassVol(); save(); }));
+el.wf.addEventListener("input", () => { el.material.value = ""; calcMassVol(); save(); });
+el.wfUnit.addEventListener("change", () => {
+  // Keep the same physical value, shown in the new unit.
+  state.wfUnit = wfUnit().sym;
+  el.wf.value = fmt(wfUnit().fromBase(state.wfKgPerL));
+  calcMassVol(); save();
+});
+el.material.addEventListener("change", () => {
+  const m = MATERIALS[Number(el.material.value)];
+  if (!m) return;
+  el.wf.value = fmt(wfUnit().fromBase(m.kgPerL));
+  calcMassVol(); save();
+});
+$("mv-swap").addEventListener("click", () => {
+  [el.mvFromUnit.value, el.mvToUnit.value] = [el.mvToUnit.value, el.mvFromUnit.value];
+  [el.mvFrom.value, el.mvTo.value] = [el.mvTo.value, el.mvFrom.value];
+  source.massvol = partner[source.massvol.id];
+  calcMassVol(); save();
+});
+
+// ---- Units --------------------------------------------------------------------------
+const currentCat = () => CATEGORIES[Number(el.category.value)];
+
+function loadCategory() {
+  const c = currentCat();
+  state.category = c.name;
+  fillSelect(el.uFromUnit, c.units, unitLabel);
+  fillSelect(el.uToUnit, c.units, unitLabel);
+  const [f, t] = state.units[c.name] || [c.from, c.to];
+  const idx = sym => Math.max(0, c.units.findIndex(u => u.sym === sym));
+  el.uFromUnit.value = idx(f);
+  el.uToUnit.value = idx(t);
+}
+
+function calcUnits() {
+  [el.uFrom, el.uTo].forEach(b => invalid(b, false));
+  const c = currentCat(), src = source.units, dst = partner[src.id];
+  const from = c.units[Number(el.uFromUnit.value)], to = c.units[Number(el.uToUnit.value)];
+  state.units[c.name] = [from.sym, to.sym];
+  const v = parse(src.value);
+  if (v === null) { dst.value = ""; return setStatus(""); }
+  if (Number.isNaN(v)) { invalid(src, true); dst.value = ""; return setStatus("Enter a number", "bad"); }
+  dst.value = fmt(src === el.uFrom ? convert(v, from, to) : convert(v, to, from));
+  setStatus(`${fmt(parse(el.uFrom.value))} ${from.sym} = ${el.uTo.value} ${to.sym}`);
+}
+
+el.category.addEventListener("change", () => { loadCategory(); calcUnits(); save(); });
+[el.uFrom, el.uTo].forEach(b => b.addEventListener("input", () => { source.units = b; calcUnits(); save(); }));
+[el.uFromUnit, el.uToUnit].forEach(s => s.addEventListener("change", () => { calcUnits(); save(); }));
+$("u-swap").addEventListener("click", () => {
+  [el.uFromUnit.value, el.uToUnit.value] = [el.uToUnit.value, el.uFromUnit.value];
+  [el.uFrom.value, el.uTo.value] = [el.uTo.value, el.uFrom.value];
+  source.units = partner[source.units.id];
+  calcUnits(); save();
+});
+
+// ---- Modes, copy, startup ------------------------------------------------------------
+const CALC = { scaling: calcScaling, massvol: calcMassVol, units: calcUnits };
+
+function showMode(mode) {
+  state.mode = mode;
+  document.querySelectorAll(".tabs button").forEach(b => {
+    const on = b.dataset.mode === mode;
+    b.setAttribute("aria-selected", String(on));
+    b.tabIndex = on ? 0 : -1;
+    $(b.dataset.mode).hidden = !on;
+  });
+  CALC[mode]();
+}
+document.querySelectorAll(".tabs button").forEach(b =>
+  b.addEventListener("click", () => { showMode(b.dataset.mode); save(); }));
+
+el.copy.addEventListener("click", () => {
+  const text = el.status.textContent;
+  if (!text) return;
+  const done = () => {
+    el.copy.textContent = "Copied ✓";
+    setTimeout(() => (el.copy.textContent = "Copy"), 1500);
+  };
+  const fallback = () => {
+    const range = document.createRange();
+    range.selectNodeContents(el.status);
+    const sel = getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    try { if (document.execCommand("copy")) done(); } catch (e) {}
+  };
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+  else fallback();
+});
+
+// Select the whole value on focus so typing replaces it.
+document.querySelectorAll('input[type="text"]').forEach(i => i.addEventListener("focus", () => i.select()));
+
+(function start() {
+  fillSelect(el.preset, PRESETS, p => p[0], "Input 1 range preset…");
+  fillSelect(el.mvFromUnit, MV_UNITS, unitLabel);
+  fillSelect(el.mvToUnit, MV_UNITS, unitLabel);
+  fillSelect(el.wfUnit, DENSITY.units, u => u.sym);
+  fillSelect(el.material, MATERIALS, m => `${m.name} · ${(m.kgPerL / LB_PER_GAL).toFixed(2)} lb/gal`, "Material preset…");
+  fillSelect(el.category, CATEGORIES, c => c.name);
+
+  el.inMin.value = fmt(state.inMin);
+  el.inMax.value = fmt(state.inMax);
+  el.outMin.value = fmt(state.outMin);
+  el.outMax.value = fmt(state.outMax);
+  el.scaleIn.value = fmt(state.scaleIn);
+
+  const mvIdx = sym => Math.max(0, MV_UNITS.findIndex(u => u.sym === sym));
+  const [mf, mt] = state.units.massvol || ["gal", "lb"];
+  el.mvFromUnit.value = mvIdx(mf);
+  el.mvToUnit.value = mvIdx(mt);
+  el.wfUnit.value = Math.max(0, DENSITY.units.findIndex(u => u.sym === state.wfUnit));
+  el.wf.value = fmt(wfUnit().fromBase(state.wfKgPerL));
+  el.mvFrom.value = "10";
+
+  el.category.value = Math.max(0, CATEGORIES.findIndex(c => c.name === state.category));
+  loadCategory();
+  el.uFrom.value = "1";
+
+  calcScaling(); calcMassVol(); calcUnits();
+  showMode(CALC[state.mode] ? state.mode : "scaling");
+})();
+
+// Chrome and Edge offer installation; show our own button when they do.
+let installPrompt = null;
+addEventListener("beforeinstallprompt", e => { e.preventDefault(); installPrompt = e; $("install").hidden = false; });
+$("install").addEventListener("click", async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice.catch(() => {});
+  installPrompt = null;
+  $("install").hidden = true;
+});
+
+// Offline support and "Install app" when served from a web host (not inside a preview frame).
+if ("serviceWorker" in navigator && /^https:|^http:\/\/localhost/.test(location.href)) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>

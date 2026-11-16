@@ -10,6 +10,10 @@ A small, always-on-top unit converter widget for Windows 10 and 11.
 - **Remembers** its position, the last category and the units you picked for each category.
 - Optional **Start with Windows** (tray menu).
 
+## Web app (PWA)
+
+`pwa/` holds a browser version with the same Scaling, Mass ↔ Volume and unit conversions. It works offline once loaded and can be installed from Chrome or Edge ("Install as an app"), on Windows or a phone. It needs to be served over HTTPS: drag the `pwa` folder onto https://app.netlify.com/drop, or host it on GitHub Pages. Bump `VERSION` in `pwa/sw.js` whenever you change a file so installed copies update.
+
 ## Keyboard
 
 | Keys | Action |
